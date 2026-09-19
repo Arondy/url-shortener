@@ -1,0 +1,46 @@
+**/*_test.go
+**/*.log
+**/*.example
+**/*.env
+**/.svelte-kit
+**/Dockerfile
+
+**/.*/
+**/mocks/
+**/node_modules/
+**/build/
+**/docs/
+
+##
+## Specific to .dockerignore
+##
+
+.git/
+contrib/
+
+##
+## Common with .gitignore
+##
+
+# Temporary files
+*~
+*#
+.#*
+
+# Vendors
+vendor/
+
+# Binaries for programs and plugins
+dist/
+gin-bin
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, build with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
