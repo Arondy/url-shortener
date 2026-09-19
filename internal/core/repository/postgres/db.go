@@ -1,0 +1,45 @@
+package postgres
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/Arondy/url-shortener/internal/config"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+	"go.uber.org/zap"
+)
+
+type DB struct {
+	pool           *pgxpool.Pool
+	requestTimeout time.Duration
+}
+
+func NewDB(ctx context.Context, config config.DBConfig, logger *zap.SugaredLogger) (*DB, error) {
+	logger.Debugf("Connecting to Postgres on %s:%d", config.Host, config.Port)
+
+	pgxConfig, err := pgxpool.ParseConfig(config.ConnString())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse connString: %w", err)
+	}
+
+	pool, err := pgxpool.NewWithConfig(ctx, pgxConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pgxpool: %w", err)
+	}
+
+	if err = pool.Ping(ctx); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("failed ping: %w", err)
+	}
+
+	return &DB{
+		pool:           pool,
+		requestTimeout: config.RequestTimeout,
+	}, nil
+}
+
+func (d *DB) Close() {
+	d.pool.Close()
+}
