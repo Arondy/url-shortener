@@ -19,7 +19,7 @@ func Run(ctx context.Context, cfg *config.Config, args args.Args, logger *zap.Su
 	var shortenerRepo url_shortener.URLShortenerRepo
 
 	if args.InMemory {
-		shortenerRepo = in_memory.NewURLShortenerRepository()
+		shortenerRepo = in_memory.NewURLShortenerRepository(cfg.URLsTTL)
 	} else {
 		db, err := postgres.NewDB(ctx, cfg.DB, logger)
 		if err != nil {
