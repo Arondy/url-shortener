@@ -1,0 +1,49 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: "3"
+
+dotenv: [".env"]
+silent: true
+
+vars:
+  LISTPKG: '{{"{{"}}if or .TestGoFiles .XTestGoFiles{{"}}"}}{{"{{"}}.ImportPath{{"}}"}} {{"{{"}}end{{"}}"}}'
+
+tasks:
+  run-shortener:
+    aliases:
+      - rs
+    desc: Run URL shortener
+    cmds:
+      - go run ./cmd/url-shortener/main.go {{.CLI_ARGS}}
+
+  run:
+    desc: Run services
+    cmds:
+      - docker compose up -d
+
+  stop:
+    desc: Stop services
+    cmds:
+      - docker compose stop
+
+  build:
+    desc: Build Docker images
+    cmds:
+      - docker build -t us/url-shortener .
+
+  create-migration:
+    desc: Create new migration
+    cmds:
+      - migrate create -ext sql -dir ./migrations -seq {{.CLI_ARGS}}
+
+  psql:
+    desc: Open psql
+    cmds:
+      - docker compose exec -it postgres psql -U {{.DB_USER}} -d {{.DB_NAME}}
+
+  test-unit:
+    aliases:
+      - tu
+    desc: Run unit tests
+    cmds:
+      - go test -race $(go list -f '{{.LISTPKG}}' ./...)
