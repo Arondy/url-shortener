@@ -18,6 +18,7 @@ type CtxKeyRequestID struct{}
 
 type Config struct {
 	DomainURL  string           `koanf:"DOMAIN_URL" validate:"required"`
+	URLsTTL    time.Duration    `koanf:"URLS_TTL" validate:"required"`
 	HTTPServer HTTPServerConfig `koanf:",squash"`
 	DB         DBConfig         `koanf:",squash"`
 }
