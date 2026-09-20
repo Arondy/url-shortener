@@ -23,10 +23,14 @@ func TestCreateAndGet_RoundTrip(t *testing.T) {
 	created, err := r.Create(ctx, domain.URL{OriginalURL: "https://example.com", ShortURLCode: "abc123_XYZ"})
 	require.NoError(t, err)
 	assert.Equal(t, "abc123_XYZ", created.ShortURLCode)
+	assert.False(t, created.CreatedAt.IsZero())
+	assert.WithinDuration(t, time.Now(), created.CreatedAt, 5*time.Second)
 
 	got, err := r.Get(ctx, "abc123_XYZ")
 	require.NoError(t, err)
-	assert.Equal(t, domain.URL{OriginalURL: "https://example.com", ShortURLCode: "abc123_XYZ"}, got)
+	assert.Equal(t, created.OriginalURL, got.OriginalURL)
+	assert.Equal(t, created.ShortURLCode, got.ShortURLCode)
+	assert.True(t, created.CreatedAt.Equal(got.CreatedAt), "Get must return CreatedAt from Create")
 }
 
 func TestCreate_SameOriginalReturnsSameCode(t *testing.T) {
@@ -41,6 +45,7 @@ func TestCreate_SameOriginalReturnsSameCode(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, first.ShortURLCode, second.ShortURLCode)
 	assert.Equal(t, "code111111", second.ShortURLCode)
+	assert.True(t, first.CreatedAt.Equal(second.CreatedAt), "idempotent Create must return original CreatedAt")
 }
 
 func TestCreate_CollisionOnShortCode(t *testing.T) {
