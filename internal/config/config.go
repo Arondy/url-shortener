@@ -37,6 +37,7 @@ type DBConfig struct {
 	SSLMode        string        `koanf:"DB_SSL_MODE" validate:"required"`
 	RequestTimeout time.Duration `koanf:"DB_REQUEST_TIMEOUT" validate:"required"`
 	URLsTTL        time.Duration `koanf:"DB_URLS_TTL" validate:"required"`
+	ClearFrequency time.Duration `koanf:"DB_CLEAR_FREQUENCY" validate:"required"`
 }
 
 func (c DBConfig) ConnString() string {
