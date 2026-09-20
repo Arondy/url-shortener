@@ -46,6 +46,7 @@ func (r *URLShortenerRepository) Get(ctx context.Context, shortCode string) (dom
 	return domain.URL{
 		OriginalURL:  entry.originalURL,
 		ShortURLCode: shortCode,
+		CreatedAt:    entry.CreatedAt,
 	}, nil
 }
 
@@ -61,6 +62,7 @@ func (r *URLShortenerRepository) Create(ctx context.Context, url domain.URL) (do
 			return domain.URL{
 				OriginalURL:  url.OriginalURL,
 				ShortURLCode: shortCode,
+				CreatedAt:    old.CreatedAt,
 			}, nil
 		}
 	}
@@ -79,14 +81,16 @@ func (r *URLShortenerRepository) Create(ctx context.Context, url domain.URL) (do
 	}
 
 	r.original2short[url.OriginalURL] = url.ShortURLCode
+	createdAt := time.Now()
 	r.short2original[url.ShortURLCode] = entry{
 		originalURL: url.OriginalURL,
-		CreatedAt:   time.Now(),
+		CreatedAt:   createdAt,
 	}
 
 	return domain.URL{
 		OriginalURL:  url.OriginalURL,
 		ShortURLCode: url.ShortURLCode,
+		CreatedAt:    createdAt,
 	}, nil
 }
 
