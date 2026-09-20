@@ -15,11 +15,16 @@ import (
 	"go.uber.org/zap"
 )
 
+type RepoWithClear interface {
+	url_shortener.URLShortenerRepo
+	ClearExpired(ctx context.Context)
+}
+
 func Run(ctx context.Context, cfg *config.Config, args args.Args, logger *zap.SugaredLogger) error {
-	var shortenerRepo url_shortener.URLShortenerRepo
+	var shortenerRepo RepoWithClear
 
 	if args.InMemory {
-		shortenerRepo = in_memory.NewURLShortenerRepository()
+		shortenerRepo = in_memory.NewURLShortenerRepository(cfg.DB.URLsTTL, cfg.DB.ClearFrequency)
 	} else {
 		db, err := postgres.NewDB(ctx, cfg.DB, logger)
 		if err != nil {
@@ -29,6 +34,8 @@ func Run(ctx context.Context, cfg *config.Config, args args.Args, logger *zap.Su
 
 		shortenerRepo = postgres.NewURLShortenerRepository(db)
 	}
+
+	go shortenerRepo.ClearExpired(ctx)
 
 	shortenerService := url_shortener.NewService(shortenerRepo)
 	shortenHander := shorten.NewShortenHandler(cfg.DomainURL, shortenerService)

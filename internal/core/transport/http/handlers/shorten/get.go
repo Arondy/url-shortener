@@ -43,8 +43,12 @@ func (h *ShortenHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	url, err := h.shortenerService.Get(r.Context(), shortCode)
 	if errors.Is(err, domain.ErrShortURLCodeNotFound) {
-		logger.Warnw("url with such short code not found", "code", shortCode)
+		logger.Debugw("url with such short code not found", "code", shortCode)
 		handlers.WriteError(w, logger, http.StatusNotFound, domain.ErrShortURLCodeNotFound.Error())
+		return
+	} else if errors.Is(err, domain.ErrShortURLCodeExpired) {
+		logger.Debugw("short code expired", "code", shortCode)
+		handlers.WriteError(w, logger, http.StatusGone, domain.ErrShortURLCodeExpired.Error())
 		return
 	} else if err != nil {
 		logger.Errorw("failed to get url by short code", "error", err, "code", shortCode)
