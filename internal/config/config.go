@@ -18,7 +18,6 @@ type CtxKeyRequestID struct{}
 
 type Config struct {
 	DomainURL  string           `koanf:"DOMAIN_URL" validate:"required"`
-	URLsTTL    time.Duration    `koanf:"URLS_TTL" validate:"required"`
 	HTTPServer HTTPServerConfig `koanf:",squash"`
 	DB         DBConfig         `koanf:",squash"`
 }
@@ -37,6 +36,7 @@ type DBConfig struct {
 	Name           string        `koanf:"DB_NAME" validate:"required"`
 	SSLMode        string        `koanf:"DB_SSL_MODE" validate:"required"`
 	RequestTimeout time.Duration `koanf:"DB_REQUEST_TIMEOUT" validate:"required"`
+	URLsTTL        time.Duration `koanf:"DB_URLS_TTL" validate:"required"`
 }
 
 func (c DBConfig) ConnString() string {
