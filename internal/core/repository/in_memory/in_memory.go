@@ -15,14 +15,16 @@ type entry struct {
 
 type URLShortenerRepository struct {
 	urlsTTL        time.Duration
+	clearFrequency time.Duration
 	original2short map[string]string
 	short2original map[string]entry
 	mu             sync.Mutex
 }
 
-func NewURLShortenerRepository(urlsTTL time.Duration) *URLShortenerRepository {
+func NewURLShortenerRepository(urlsTTL, clearFrequency time.Duration) *URLShortenerRepository {
 	return &URLShortenerRepository{
 		urlsTTL:        urlsTTL,
+		clearFrequency: clearFrequency,
 		original2short: make(map[string]string),
 		short2original: make(map[string]entry),
 	}
@@ -92,6 +94,29 @@ func (r *URLShortenerRepository) Create(ctx context.Context, url domain.URL) (do
 		ShortURLCode: url.ShortURLCode,
 		CreatedAt:    createdAt,
 	}, nil
+}
+
+func (r *URLShortenerRepository) ClearExpired(ctx context.Context) {
+	ticker := time.NewTicker(r.clearFrequency)
+	defer ticker.Stop()
+
+	for {
+		r.mu.Lock()
+		for k, v := range r.short2original {
+			if r.isExpired(v) {
+				delete(r.short2original, k)
+				delete(r.original2short, v.originalURL)
+			}
+		}
+		r.mu.Unlock()
+
+		select {
+		case <-ticker.C:
+			continue
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 func (r *URLShortenerRepository) isExpired(e entry) bool {

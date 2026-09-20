@@ -1,4 +1,4 @@
-package in_memory_test
+package in_memory
 
 import (
 	"context"
@@ -8,16 +8,18 @@ import (
 	"time"
 
 	"github.com/Arondy/url-shortener/internal/core/domain"
-	"github.com/Arondy/url-shortener/internal/core/repository/in_memory"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-const testTTL = time.Hour
+const (
+	testTTL            = time.Hour
+	testClearFrequency = time.Hour
+)
 
 func TestCreateAndGet_RoundTrip(t *testing.T) {
 	t.Parallel()
-	r := in_memory.NewURLShortenerRepository(testTTL)
+	r := NewURLShortenerRepository(testTTL, testClearFrequency)
 	ctx := context.Background()
 
 	created, err := r.Create(ctx, domain.URL{OriginalURL: "https://example.com", ShortURLCode: "abc123_XYZ"})
@@ -35,7 +37,7 @@ func TestCreateAndGet_RoundTrip(t *testing.T) {
 
 func TestCreate_SameOriginalReturnsSameCode(t *testing.T) {
 	t.Parallel()
-	r := in_memory.NewURLShortenerRepository(testTTL)
+	r := NewURLShortenerRepository(testTTL, testClearFrequency)
 	ctx := context.Background()
 
 	first, err := r.Create(ctx, domain.URL{OriginalURL: "https://example.com", ShortURLCode: "code111111"})
@@ -50,7 +52,7 @@ func TestCreate_SameOriginalReturnsSameCode(t *testing.T) {
 
 func TestCreate_CollisionOnShortCode(t *testing.T) {
 	t.Parallel()
-	r := in_memory.NewURLShortenerRepository(testTTL)
+	r := NewURLShortenerRepository(testTTL, testClearFrequency)
 	ctx := context.Background()
 
 	_, err := r.Create(ctx, domain.URL{OriginalURL: "https://a.com", ShortURLCode: "samecode12"})
@@ -62,7 +64,7 @@ func TestCreate_CollisionOnShortCode(t *testing.T) {
 
 func TestGet_NotFound(t *testing.T) {
 	t.Parallel()
-	r := in_memory.NewURLShortenerRepository(testTTL)
+	r := NewURLShortenerRepository(testTTL, testClearFrequency)
 
 	_, err := r.Get(context.Background(), "missing123")
 	require.ErrorIs(t, err, domain.ErrShortURLCodeNotFound)
@@ -70,7 +72,7 @@ func TestGet_NotFound(t *testing.T) {
 
 func TestGet_Expired(t *testing.T) {
 	t.Parallel()
-	r := in_memory.NewURLShortenerRepository(50 * time.Millisecond)
+	r := NewURLShortenerRepository(50*time.Millisecond, testClearFrequency)
 	ctx := context.Background()
 
 	_, err := r.Create(ctx, domain.URL{OriginalURL: "https://example.com", ShortURLCode: "expiring01"})
@@ -88,7 +90,7 @@ func TestGet_Expired(t *testing.T) {
 
 func TestCreate_ExpiredShortCanBeReused(t *testing.T) {
 	t.Parallel()
-	r := in_memory.NewURLShortenerRepository(50 * time.Millisecond)
+	r := NewURLShortenerRepository(50*time.Millisecond, testClearFrequency)
 	ctx := context.Background()
 
 	_, err := r.Create(ctx, domain.URL{OriginalURL: "https://a.com", ShortURLCode: "reuse00001"})
@@ -112,7 +114,7 @@ func TestCreate_ExpiredShortCanBeReused(t *testing.T) {
 
 func TestCreate_ExpiredOriginalCanBeRewritten(t *testing.T) {
 	t.Parallel()
-	r := in_memory.NewURLShortenerRepository(50 * time.Millisecond)
+	r := NewURLShortenerRepository(50*time.Millisecond, testClearFrequency)
 	ctx := context.Background()
 
 	_, err := r.Create(ctx, domain.URL{OriginalURL: "https://a.com", ShortURLCode: "oldcode001"})
@@ -135,7 +137,7 @@ func TestCreate_ExpiredOriginalCanBeRewritten(t *testing.T) {
 
 func TestCreate_SamePairAfterExpiry(t *testing.T) {
 	t.Parallel()
-	r := in_memory.NewURLShortenerRepository(50 * time.Millisecond)
+	r := NewURLShortenerRepository(50*time.Millisecond, testClearFrequency)
 	ctx := context.Background()
 
 	_, err := r.Create(ctx, domain.URL{OriginalURL: "https://a.com", ShortURLCode: "samepair01"})
@@ -154,7 +156,7 @@ func TestCreate_SamePairAfterExpiry(t *testing.T) {
 
 func TestCreate_ExpiredOriginalWithCollidingFreshShort(t *testing.T) {
 	t.Parallel()
-	r := in_memory.NewURLShortenerRepository(50 * time.Millisecond)
+	r := NewURLShortenerRepository(50*time.Millisecond, testClearFrequency)
 	ctx := context.Background()
 
 	_, err := r.Create(ctx, domain.URL{OriginalURL: "https://a.com", ShortURLCode: "oldcode001"})
@@ -172,7 +174,7 @@ func TestCreate_ExpiredOriginalWithCollidingFreshShort(t *testing.T) {
 
 func TestConcurrent_CreateAndGet(t *testing.T) {
 	t.Parallel()
-	r := in_memory.NewURLShortenerRepository(testTTL)
+	r := NewURLShortenerRepository(testTTL, testClearFrequency)
 	ctx := context.Background()
 
 	const n = 100
@@ -199,5 +201,57 @@ func TestConcurrent_CreateAndGet(t *testing.T) {
 	wg.Wait()
 	for _, err := range errs {
 		assert.NoError(t, err)
+	}
+}
+
+func TestClearExpired_RemovesExpiredKeepsFresh(t *testing.T) {
+	t.Parallel()
+
+	r := NewURLShortenerRepository(time.Hour, 10*time.Millisecond)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	r.mu.Lock()
+	r.short2original["expired001"] = entry{originalURL: "https://expired.com", CreatedAt: time.Now().Add(-2 * time.Hour)}
+	r.original2short["https://expired.com"] = "expired001"
+	r.mu.Unlock()
+
+	_, err := r.Create(ctx, domain.URL{OriginalURL: "https://fresh.com", ShortURLCode: "fresh00001"})
+	require.NoError(t, err)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		r.ClearExpired(ctx)
+	}()
+
+	require.Eventually(t, func() bool {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+
+		_, expiredCode := r.short2original["expired001"]
+		_, expiredOriginal := r.original2short["https://expired.com"]
+		return !expiredCode && !expiredOriginal
+	}, time.Second, 10*time.Millisecond)
+
+	r.mu.Lock()
+	fresh := r.short2original["fresh00001"]
+	freshOriginal := r.original2short["https://fresh.com"]
+	r.mu.Unlock()
+	assert.Equal(t, "https://fresh.com", fresh.originalURL)
+	assert.Equal(t, "fresh00001", freshOriginal)
+
+	_, err = r.Get(ctx, "expired001")
+	require.ErrorIs(t, err, domain.ErrShortURLCodeNotFound)
+
+	got, err := r.Get(ctx, "fresh00001")
+	require.NoError(t, err)
+	assert.Equal(t, "https://fresh.com", got.OriginalURL)
+
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("ClearExpired did not stop after context cancellation")
 	}
 }
