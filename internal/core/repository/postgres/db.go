@@ -15,6 +15,7 @@ type DB struct {
 	pool           *pgxpool.Pool
 	requestTimeout time.Duration
 	urlsTTL        time.Duration
+	clearFrequency time.Duration
 }
 
 func NewDB(ctx context.Context, config config.DBConfig, logger *zap.SugaredLogger) (*DB, error) {
@@ -39,6 +40,7 @@ func NewDB(ctx context.Context, config config.DBConfig, logger *zap.SugaredLogge
 		pool:           pool,
 		requestTimeout: config.RequestTimeout,
 		urlsTTL:        config.URLsTTL,
+		clearFrequency: config.ClearFrequency,
 	}, nil
 }
 

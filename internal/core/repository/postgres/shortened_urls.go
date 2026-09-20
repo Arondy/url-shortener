@@ -196,6 +196,30 @@ func (r *URLShortenerRepository) insertNew(ctx context.Context, url domain.URL) 
 	return createdURL, nil
 }
 
+func (r *URLShortenerRepository) ClearExpired(ctx context.Context) {
+	ticker := time.NewTicker(r.clearFrequency)
+	defer ticker.Stop()
+
+	for {
+		reqCtx, cancel := context.WithTimeout(ctx, r.requestTimeout)
+
+		query := `
+		DELETE FROM shortened_urls
+		WHERE created_at < $1
+		`
+
+		r.pool.Exec(reqCtx, query, time.Now().Add(-r.urlsTTL))
+		cancel()
+
+		select {
+		case <-ticker.C:
+			continue
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
 func (r *URLShortenerRepository) isExpired(createdAt time.Time) bool {
 	return time.Since(createdAt) > r.urlsTTL
 }
